@@ -8,7 +8,7 @@ from scrapy.selector import Selector
 class ExampleSpider(scrapy.Spider):
     name = 'example'
     allowed_domains = ['poi.mapbar.com']
-    start_urls = ['https://poi.mapbar.com/wuxi/MAPIFPCPTNFWQOHPTITOC']
+    start_urls = ['https://poi.mapbar.com/']
 
     def getdict(self, item):
         result = dict()
@@ -46,16 +46,43 @@ class ExampleSpider(scrapy.Spider):
         city = msg['city']
         print("address =", province, city, town, address_path[-1].strip())
 
-    def getaddresses(self, cityurl):
-        pass
+    def getaddresses(self, response):
+        dl_selectors = Selector(response=response).xpath('//div[@class="sortC"]/dl')
+        print("dl_selectors ", dl_selectors)
+        for dl_selector in dl_selectors:
+            print("dl_selector ", dl_selector)
+            a_selectors = dl_selector.xpath('./dd/a[@href]')
+            for selector in a_selectors:
+                item = ScrapyTestItem()  # 实例化一个 DmozItem 类
+                item['name'] = selector.xpath("text()").get()
+                item['url'] = selector.xpath("@href").get()
+                print("selector item =", item)
+                # yield self.getaddresstype(item)
+                # yield item
 
-    def getaddresstype(self, cityItem):
-        pass
+    def gettypes(self, selectors):
+        print("selectors ", selectors)
+        a_selectors = selectors.xpath('./a[@href]')
+        print("a_selectors ", a_selectors)
+        for selector in a_selectors:
+            typeurl = selector.xpath('@href').get()
+            type = selector.xpath('text()').get()
+            print("typeurl=", typeurl, "type=", type)
+
+    def getaddresstype(self, response):
+        row_selectors = Selector(response=response).xpath('//div[@class="isortRow"]')
+        # for row_selector in row_selectors:
+        if len(row_selectors) > 1:
+            row_selector = row_selectors[-1]
+            print("row_selector ", row_selector)
+            # 只获取小区数据
+            house_selectors = row_selector.xpath('./h3[contains(., "小区")]/following-sibling::div[1]')
+            business_selectors = row_selector.xpath('./h3[contains(., "商务")]/following-sibling::div[1]')
+            self.gettypes(house_selectors)
+            self.gettypes(business_selectors)
 
     def getcity(self, response):
-        # Get all the <a> tags
         dd_selectors = Selector(response=response).xpath('//dl[contains(@class, "city_list")]/dd')
-        # Loop on each tag
         for dd_selector in dd_selectors:
             print("dd_selector ", dd_selector)
             a_selectors = dd_selector.xpath('a[@href]')
@@ -64,14 +91,10 @@ class ExampleSpider(scrapy.Spider):
                 item['name'] = selector.xpath("text()").get()
                 item['url'] = selector.xpath("@href").get()
                 print("selector item =", item)
-                # yield self.getaddresstype(item)
-                yield item
+                yield self.getaddresstype(item)
 
     def parse(self, response):
-        """ Main function that parses downloaded pages """
         print("parse url:", response)
-        # self.getcity(response)
-        self.getaddressdetail(response)
+        self.getcity(response)
 
 # json.dumps(d, ensure_ascii=False, encoding='utf-8'))
-# json.loads(jd, encoding='utf-8')
